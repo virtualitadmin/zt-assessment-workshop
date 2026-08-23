@@ -49,7 +49,7 @@ if (-not (Test-Path 'C:\Program Files\PowerShell\7\pwsh.exe')) {
     $Msi = 'C:\Windows\Temp\pwsh7.msi'
     # Pinned version (fewer redirects than /latest/, deterministic installs).
     # Update the version here when a new LTS is adopted.
-    Get-FileWithRetry -Uri 'https://ztstaging53820.blob.core.windows.net/installers/PowerShell-7.4.6-win-x64.msi?se=2026-09-22T16%3A00Z&sp=r&sv=2026-04-06&sr=b&sig=1qbiwR7i3zxPSaZ2K4ZM18Gg9Y%2FeoArluDWMuVJCzfc%3D' -OutFile $Msi
+    Get-FileWithRetry -Uri 'https://ztstaging11106.blob.core.windows.net/installers/PowerShell-7.4.6-win-x64.msi?se=2026-09-22T16%3A41Z&sp=r&sv=2026-04-06&sr=b&sig=VXZBSrELlSJ5%2FGQRzNrwQi%2FBr3dMsZoDgAZQPV2i9fk%3D' -OutFile $Msi
     Start-Process msiexec.exe -ArgumentList "/i `"$Msi`" /qn /norestart ADD_PATH=1" -Wait
     Remove-Item $Msi -Force
 } else { Write-Output 'PowerShell 7 already installed.' }
