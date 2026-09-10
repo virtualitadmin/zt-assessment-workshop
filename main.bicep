@@ -71,6 +71,28 @@ param vnetAddressPrefix string = '10.60.0.0/24'
 @description('Leave at default. Changes every deployment, forcing the VM setup extension to re-execute (and re-download its script).')
 param deploymentTimestamp string = utcNow()
 
+@description('Base tags applied to ALL resources. The lighter set.')
+param baseTags object = {
+  'created by': ''
+  environment: 'test'
+  service: 'security-assessment'
+  sme: ''
+  'used-by': ''
+}
+
+@description('Additional tags applied to the VM and its directly attached resources (NIC, extensions), merged on top of baseTags.')
+param vmExtraTags object = {
+  Application: 'Zero Trust Assessment'
+  'backup-policy': 'none'
+  'bcp-priority': 'low'
+  Owner: ''
+  'patch-schedule': 'default'
+  'power-profile': 'always-on'
+}
+
+// Full ten-tag set for the VM and its attached resources
+var vmTags = union(baseTags, vmExtraTags)
+
 // ===========================================================================
 var storageName = toLower('${baseName}${uniqueString(resourceGroup().id)}')
 var automationName = '${baseName}-aa'
@@ -84,6 +106,7 @@ var runbookName = 'ZeroTrustAssessment'
 resource storage 'Microsoft.Storage/storageAccounts@2023-05-01' = {
   name: take(storageName, 24)
   location: location
+  tags: baseTags
   sku: { name: 'Standard_LRS' }
   kind: 'StorageV2'
   properties: {
@@ -141,6 +164,7 @@ resource storageRbac 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
 resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' = {
   name: take('${baseName}-kv-${uniqueString(resourceGroup().id)}', 24)
   location: location
+  tags: baseTags
   properties: {
     tenantId: tenantId
     sku: { family: 'A', name: 'standard' }
@@ -154,6 +178,7 @@ resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' = {
 resource deployIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = {
   name: '${baseName}-deploy-id'
   location: location
+  tags: baseTags
 }
 
 // Key Vault Certificates Officer for the deployment identity (create the cert)
@@ -184,6 +209,7 @@ resource kvSecretsUser 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
 resource certScript 'Microsoft.Resources/deploymentScripts@2023-08-01' = {
   name: '${baseName}-create-cert'
   location: location
+  tags: baseTags
   kind: 'AzurePowerShell'
   identity: {
     type: 'UserAssigned'
@@ -229,6 +255,7 @@ resource certScript 'Microsoft.Resources/deploymentScripts@2023-08-01' = {
 resource automation 'Microsoft.Automation/automationAccounts@2023-11-01' = {
   name: automationName
   location: location
+  tags: baseTags
   identity: { type: 'SystemAssigned' }
   properties: {
     sku: { name: 'Basic' }
@@ -270,6 +297,7 @@ resource runbook 'Microsoft.Automation/automationAccounts/runbooks@2023-11-01' =
   parent: automation
   name: runbookName
   location: location
+  tags: baseTags
   properties: {
     runbookType: 'PowerShell72'
     logProgress: false
@@ -307,6 +335,7 @@ resource aaContributor 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
 resource linkSchedule 'Microsoft.Resources/deploymentScripts@2023-08-01' = {
   name: '${baseName}-link-schedule'
   location: location
+  tags: baseTags
   kind: 'AzurePowerShell'
   identity: {
     type: 'UserAssigned'
@@ -343,6 +372,7 @@ resource linkSchedule 'Microsoft.Resources/deploymentScripts@2023-08-01' = {
 resource nsg 'Microsoft.Network/networkSecurityGroups@2023-11-01' = {
   name: '${baseName}-nsg'
   location: location
+  tags: baseTags
   properties: {
     securityRules: [] // outbound HTTPS is allowed by default; no inbound required
   }
@@ -351,6 +381,7 @@ resource nsg 'Microsoft.Network/networkSecurityGroups@2023-11-01' = {
 resource vnet 'Microsoft.Network/virtualNetworks@2023-11-01' = {
   name: '${baseName}-vnet'
   location: location
+  tags: baseTags
   properties: {
     addressSpace: { addressPrefixes: [vnetAddressPrefix] }
     subnets: [
@@ -368,6 +399,7 @@ resource vnet 'Microsoft.Network/virtualNetworks@2023-11-01' = {
 resource nic 'Microsoft.Network/networkInterfaces@2023-11-01' = {
   name: '${vmName}-nic'
   location: location
+  tags: vmTags
   properties: {
     ipConfigurations: [
       {
@@ -384,6 +416,7 @@ resource nic 'Microsoft.Network/networkInterfaces@2023-11-01' = {
 resource vm 'Microsoft.Compute/virtualMachines@2024-03-01' = {
   name: vmName
   location: location
+  tags: vmTags
   identity: { type: 'SystemAssigned' }
   properties: {
     hardwareProfile: { vmSize: vmSize }
@@ -415,6 +448,7 @@ resource vmSetup 'Microsoft.Compute/virtualMachines/extensions@2024-03-01' = {
   parent: vm
   name: 'SetupAssessmentPrereqs'
   location: location
+  tags: vmTags
   properties: {
     publisher: 'Microsoft.Compute'
     type: 'CustomScriptExtension'
@@ -446,6 +480,7 @@ resource workerExtension 'Microsoft.Compute/virtualMachines/extensions@2024-03-0
   parent: vm
   name: 'HybridWorkerExtension'
   location: location
+  tags: vmTags
   properties: {
     publisher: 'Microsoft.Azure.Automation.HybridWorker'
     type: 'HybridWorkerForWindows'
